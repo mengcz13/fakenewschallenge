@@ -1,0 +1,4 @@
+numpy==1.11.3
+gensim==2.1.0
+torch==0.1.12.post2
+scikit_learn==0.18.1
