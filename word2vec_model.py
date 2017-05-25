@@ -66,6 +66,9 @@ class Data(object):
             self._get_vec_from_words(article[1], fillzerosto=self.maxbodylen), self.stance2intmap[article[2]]),
                    self.article_list)
 
+    def get_article_list(self):
+        return self.article_list
+
     def get_batch(self, batch_size):
         binput = []
         boutput = []
