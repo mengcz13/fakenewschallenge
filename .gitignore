@@ -1,4 +1,6 @@
 /data/*.bin
 /data/doc2vec*
+/data/*
 *.pyc
 /.idea
+*.pkl
