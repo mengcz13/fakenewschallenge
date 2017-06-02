@@ -9,6 +9,8 @@ from sklearn import feature_extraction
 from gensim.models.keyedvectors import KeyedVectors
 import torch
 from torch.autograd import Variable
+import random
+import collections
 
 
 class Data(object):
@@ -35,9 +37,10 @@ class Data(object):
                                               self._preprocess_text(id2body_map[int(stance['Body ID'])],
                                                                     trunc=body_trunc),
                                               stance['Stance']))
+                random.shuffle(self.article_list)
                 print(self.article_list[0])
 
-        self.int2stancemap = list(set([a[2] for a in self.article_list]))
+        self.int2stancemap = sorted(list(set([a[2] for a in self.article_list])))
         self.stance2intmap = {}
         for t in range(len(self.int2stancemap)):
             self.stance2intmap[self.int2stancemap[t]] = t
@@ -45,20 +48,15 @@ class Data(object):
         print('Generating statistics...')
         self.maxtitlelen = max((len(a[0]) for a in self.article_list))
         print('Max length of title:', self.maxtitlelen)
-        self.maxtitlelen = max((self.maxtitlelen, title_trunc))
+        self.maxtitlelen = min((self.maxtitlelen, title_trunc))
         print('Truncated title length:', self.maxtitlelen)
         self.maxbodylen = max((len(a[1]) for a in self.article_list))
         print('Max length of body:', self.maxbodylen)
-        self.maxbodylen = max((self.maxbodylen, body_trunc))
+        self.maxbodylen = min((self.maxbodylen, body_trunc))
         print('Truncated body length:', self.maxbodylen)
         self.stancelen = len(self.int2stancemap)
         print('Kinds of stance:', self.stancelen)
         print('Stances:', self.stance2intmap)
-
-        print('Loading %s' % word2vecmodelfile)
-        self._model = KeyedVectors.load_word2vec_format(word2vec_bin_path, binary=True)
-        self.vecdim = self._modeldim = self._model.vector_size
-        print('Dim of word vector:', self.vecdim)
 
         self.trainsize = round(train_ratio * len(self.article_list))
         self.validatesize = len(self.article_list) - self.trainsize
@@ -66,62 +64,48 @@ class Data(object):
         self.train_article_list = self.article_list[:trainsize]
         self.validate_article_list = self.article_list[trainsize:]
 
-        self.trainvecs = list(self._data(self.train_article_list))
-        self.validatevecs = list(self._data(self.validate_article_list))
+        # random sample on train article list
+        train_stance_col = collections.Counter([a[2] for a in self.train_article_list])
+        mc = train_stance_col.most_common(1)[0]
+        for st, cn in train_stance_col.items():
+            if st != mc[0]:
+                assert cn <= mc[1]
+                pop = [a for a in self.train_article_list if a[2] == st]
+                self.train_article_list.extend(random.choices(pop, k=mc[1] - cn))
+                self.trainsize += (mc[1] - cn)
+        random.shuffle(self.train_article_list)
+        print(collections.Counter([a[2] for a in self.train_article_list]))
 
-        self.train_dataiter = iter(self.trainvecs)
-        self.validate_dataiter = iter(self.validatevecs)
+        print('Loading %s' % word2vecmodelfile)
+        isbinary = word2vecmodelfile.split('.')[-1] == 'bin'
+        self._model = KeyedVectors.load_word2vec_format(word2vec_bin_path, binary=isbinary)
+        self.vecdim = self._modeldim = self._model.vector_size
+        print('Dim of word vector:', self.vecdim)
 
-    def train_data(self):
-        return iter(self.trainvecs)
+        self.trainvecs, self.trainres = self._data(self.train_article_list)
+        self.validatevecs, self.validateres = self._data(self.validate_article_list)
 
-    def validate_data(self):
-        return iter(self.validatevecs)
+    def train_batch(self, batch_size):
+        return self._batch(self.trainvecs, self.trainres, self.trainsize, batch_size)
 
-    def train_get_batch(self, batch_size):
-        binput = []
-        boutput = []
-        for tx in range(batch_size):
-            try:
-                tdata = next(self.train_dataiter)
-            except StopIteration:
-                self.train_dataiter = self.train_data()
-                break
-            binput.append(tdata[0].astype(np.float64))
-            boutput.append(tdata[1])
-        inputshape = binput[0].shape
-        binput = torch.FloatTensor(binput).view(-1, 1, inputshape[0], inputshape[1])
-        boutput = torch.LongTensor(boutput).view(-1)
-        return binput, boutput
+    def validate_batch(self, batch_size):
+        return self._batch(self.validatevecs, self.validateres, self.validatesize, batch_size)
 
-    def validate_get_batch(self, batch_size):
-        binput = []
-        boutput = []
-        for tx in range(batch_size):
-            try:
-                tdata = next(self.validate_dataiter)
-            except StopIteration:
-                self.validate_dataiter = self.validate_data()
-                break
-            binput.append(tdata[0].astype(np.float64))
-            boutput.append(tdata[1])
-        inputshape = binput[0].shape
-        binput = torch.FloatTensor(binput).view(-1, 1, inputshape[0], inputshape[1])
-        boutput = torch.LongTensor(boutput).view(-1)
-        return binput, boutput
+    def _batch(self, vecs, res, vecslen, batch_size):
+        t = 0
+        while t < vecslen:
+            if t + batch_size < vecslen:
+                absize = batch_size
+            else:
+                absize = vecslen - t
+            yield vecs[t:t + batch_size], res[t:t + batch_size], t // batch_size, absize
+            t += batch_size
 
     def _data(self, alist):
-        '''
-        Get the iterator of all vectorized articles.
-        :return: a new iterator of vectorized articles 
-        '''
-        return map(lambda article: (
-            self._get_vec_from_words(article[0], self.maxtitlelen, article[1], self.maxbodylen),
-            self.stance2intmap[article[2]]),
-                   alist)
-
-    def get_article_list(self):
-        return self.article_list
+        return list(map(lambda article:
+                        self._get_vec_from_words(article[0], self.maxtitlelen, article[1], self.maxbodylen), alist)), \
+               list(map(lambda article:
+                        self.stance2intmap[article[2]], alist))
 
     def _clean(self, s):
         return map(lambda x: x.lower(), re.findall(r'[a-zA-Z]+', s, flags=re.UNICODE))
@@ -150,7 +134,7 @@ class Data(object):
                 vecs[t + fillzerosto0] = self._model.word_vec(s1[t])
             except KeyError:
                 pass
-        return np.vstack(tuple(vecs))
+        return np.vstack(tuple(vecs)).astype(np.float64)
 
 
 if __name__ == '__main__':

@@ -33,12 +33,14 @@ class CNNSDModel(nn.Module):
 
 class NNModel(nn.Module):
     def __init__(self, title_input_size, title_out_channels, title_kernel_width, body_input_size, body_out_channels,
-                 body_kernel_width, catnum):
+                 body_kernel_width, hiddennum, dropout, catnum):
         super(NNModel, self).__init__()
         self.titlelen = title_input_size[1]
         self.title_cnn = CNNSDModel(title_input_size, title_out_channels, title_kernel_width)
         self.body_cnn = CNNSDModel(body_input_size, body_out_channels, body_kernel_width)
-        self.linear = nn.Linear(title_out_channels + body_out_channels, catnum)
+        self.linear = nn.Linear(title_out_channels + body_out_channels, hiddennum)
+        self.dropout = nn.Dropout(dropout)
+        self.classifier = nn.Linear(hiddennum, catnum)
         self.softmax = nn.Softmax()
 
     def forward(self, input):
@@ -48,7 +50,14 @@ class NNModel(nn.Module):
         bemb = self.body_cnn(body_input)
         self.embedding = (temb, bemb)
         emb = torch.cat((temb, bemb), dim=1)
-        return self.softmax(self.linear(emb))
+        hidden = self.linear(emb)
+        return self.softmax(self.classifier(self.dropout(hidden)))
+
+    def format_data(self, xin, yin):
+        xinputshape = xin[0].shape
+        xformateed = Variable(torch.FloatTensor(xin).view(-1, 1, xinputshape[0], xinputshape[1]), requires_grad=True)
+        yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
+        return xformateed, yformateed
 
 
 
