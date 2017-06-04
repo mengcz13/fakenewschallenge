@@ -3,6 +3,7 @@
 from word2vec_model import Data
 from nnmodel import NNModel
 from birnn import BiRNNModel
+from attentionrnn import GlobalNMTAttentionRNNModel, QAGlobalAttentionRNNModel
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -19,12 +20,24 @@ from sklearn.metrics import confusion_matrix
 
 
 class RedirectedWechatOut(object):
-    def write(self, s, sysstdout):
+    def __init__(self, originout):
+        self.originout = originout
+
+    def write(self, s):
         try:
             itchat.send(('%s' % (s)).rstrip('\r\n'), toUserName='filehelper')
-            sysstdout.write(s)
+            self.originout.write(s)
         except:
             pass
+
+class ModelWithEmbedding(nn.Module):
+    def __init__(self, wordnum, vecdim, model):
+        super(ModelWithEmbedding, self).__init__()
+        self.embedding = nn.Embedding(wordnum, vecdim)
+        self.model = model
+
+    def forward(self, x):
+        return self.model(self.embedding(x))
 
 
 def main():
@@ -57,6 +70,8 @@ def main():
                         help='use wechat to notify')
     parser.add_argument('model', type=str,
                         help='type of model')
+    parser.add_argument('modelpath', type=str,
+                        help='path to save model')
     parser.add_argument('--optimizer', type=str, default='Adam',
                         help='type of optimizer')
     options = parser.parse_args()
@@ -70,7 +85,7 @@ def main():
 
     random.seed(options.seed)
 
-    MODELPATH = options.model
+    MODELPATH = options.modelpath
     if not os.path.exists(MODELPATH):
         os.mkdir(MODELPATH)
 
@@ -106,6 +121,21 @@ def main():
             bidirectional=True,
             on_cuda=options.cuda
         ),
+        'rnn_gru_cond_bi': BiRNNModel(
+            titleninput=traindata.vecdim,
+            bodyninput=traindata.vecdim,
+            nhidden=traindata.vecdim,
+            nlayers=2,
+            classify_hidden=4 * traindata.vecdim,
+            nclass=traindata.stancelen,
+            title_len=traindata.maxtitlelen,
+            body_len=traindata.maxbodylen,
+            rnntype='GRU',
+            dropout=0.1,
+            conditional=True,
+            bidirectional=True,
+            on_cuda=options.cuda
+        ),
         'rnn_lstm_nocond_bi': BiRNNModel(
             titleninput=traindata.vecdim,
             bodyninput=traindata.vecdim,
@@ -121,6 +151,51 @@ def main():
             bidirectional=True,
             on_cuda=options.cuda
         ),
+        'rnn_gru_nocond_bi': BiRNNModel(
+            titleninput=traindata.vecdim,
+            bodyninput=traindata.vecdim,
+            nhidden=traindata.vecdim,
+            nlayers=2,
+            classify_hidden=4 * traindata.vecdim,
+            nclass=traindata.stancelen,
+            title_len=traindata.maxtitlelen,
+            body_len=traindata.maxbodylen,
+            rnntype='GRU',
+            dropout=0.1,
+            conditional=False,
+            bidirectional=True,
+            on_cuda=options.cuda
+        ),
+        'globalnmt_attention_gru_cond_bi': GlobalNMTAttentionRNNModel(
+            titleninput=traindata.vecdim,
+            bodyninput=traindata.vecdim,
+            nhidden=traindata.vecdim,
+            nlayers=2,
+            classify_hidden=4 * traindata.vecdim,
+            nclass=traindata.stancelen,
+            title_len=traindata.maxtitlelen,
+            body_len=traindata.maxbodylen,
+            rnntype='GRU',
+            dropout=0.1,
+            conditional=True,
+            bidirectional=True,
+            on_cuda=options.cuda
+        ),
+        'qaglobal_attention_gru_cond_bi': QAGlobalAttentionRNNModel(
+            titleninput=traindata.vecdim,
+            bodyninput=traindata.vecdim,
+            nhidden=traindata.vecdim,
+            nlayers=2,
+            classify_hidden=4 * traindata.vecdim,
+            nclass=traindata.stancelen,
+            title_len=traindata.maxtitlelen,
+            body_len=traindata.maxbodylen,
+            rnntype='GRU',
+            dropout=0.1,
+            conditional=True,
+            bidirectional=True,
+            on_cuda=options.cuda
+        )
     }
 
     nnmodel = models[options.model]
