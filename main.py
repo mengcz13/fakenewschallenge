@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from word2vec_model import Data
+from word2vec_model import EmbData
 from nnmodel import NNModel
 from birnn import BiRNNModel
 from attentionrnn import GlobalNMTAttentionRNNModel, QAGlobalAttentionRNNModel
@@ -31,21 +31,33 @@ class RedirectedWechatOut(object):
             pass
 
 class ModelWithEmbedding(nn.Module):
-    def __init__(self, wordnum, vecdim, model):
+    def __init__(self, wordnum, vecdim, model, pretrained_embedding=None, fix_embedding=False):
         super(ModelWithEmbedding, self).__init__()
         self.embedding = nn.Embedding(wordnum, vecdim)
         self.model = model
+        if pretrained_embedding is not None:
+            self.embedding.weight.data.copy_(torch.from_numpy(pretrained_embedding))
+            if fix_embedding:
+                self.embedding.weight.requires_grad = False
+
 
     def forward(self, x):
         return self.model(self.embedding(x))
+
+    def format_data(self, xin, yin):
+        xformateed = Variable(torch.LongTensor(xin), requires_grad=False)
+        yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
+        return xformateed, yformateed
 
 
 def main():
     parser = ArgumentParser()
     parser.add_argument('--datapath', type=str, default='./data',
-                        help='path to the data folder, which contains GoogleNews-vectors and training data')
-    parser.add_argument('--word2vecmodelfile', type=str, default='glove.twitter.27B.50d.txt',
+                        help='path to the data folder')
+    parser.add_argument('--word2vecmodelfile', type=str, default='glove.twitter.27B.100d.txt',
                         help='file name of pre-trained word2vec model')
+    parser.add_argument('--fix_embedding', action='store_true',
+                        help='fix pre-trained embedding')
     parser.add_argument('--train_ratio', type=float, default=0.8,
                         help='ratio of train set in all data')
     parser.add_argument('--remove_stopwords', action='store_true',
@@ -74,6 +86,8 @@ def main():
                         help='path to save model')
     parser.add_argument('--optimizer', type=str, default='Adam',
                         help='type of optimizer')
+    parser.add_argument('--selfemb', type=int, default=None,
+                        help='add embedding as a section of network, instead of using pre-trained word2vec')
     options = parser.parse_args()
     print(options)
 
@@ -84,14 +98,21 @@ def main():
         sys.stdout = redirectedWechatOut
 
     random.seed(options.seed)
+    torch.manual_seed(options.seed)
+    if options.cuda:
+        torch.cuda.manual_seed(options.seed)
 
     MODELPATH = options.modelpath
     if not os.path.exists(MODELPATH):
-        os.mkdir(MODELPATH)
+        os.makedirs(MODELPATH)
 
-    traindata = Data(options.datapath, options.word2vecmodelfile, options.train_ratio, options.remove_stopwords,
-                     options.title_trunc,
-                     options.body_trunc)
+    if options.selfemb is not None:
+        traindata = EmbData(options.datapath, options.train_ratio, options.remove_stopwords, options.title_trunc,
+                     options.body_trunc, selfembedding=True, word2vecmodelfile=None, vecdim=options.selfemb)
+    else:
+        traindata = EmbData(options.datapath, options.train_ratio, options.remove_stopwords, options.title_trunc,
+                            options.body_trunc, selfembedding=False, word2vecmodelfile=options.word2vecmodelfile,
+                            vecdim=None)
 
     # Build model, optimizer and loss function
     models = {
@@ -198,12 +219,17 @@ def main():
         )
     }
 
-    nnmodel = models[options.model]
+    if options.selfemb is not None:
+        nnmodel = ModelWithEmbedding(traindata.wordnum, traindata.vecdim, models[options.model],
+                                     pretrained_embedding=None, fix_embedding=False)
+    else:
+        nnmodel = ModelWithEmbedding(traindata.wordnum, traindata.vecdim, models[options.model],
+                                     pretrained_embedding=traindata.embedding, fix_embedding=options.fix_embedding)
 
     if options.cuda:
         nnmodel = nnmodel.cuda()
 
-    optimizer = getattr(optim, options.optimizer)(nnmodel.parameters(),
+    optimizer = getattr(optim, options.optimizer)(filter(lambda p: p.requires_grad, nnmodel.parameters()),
                                                   lr=options.lr,
                                                   weight_decay=options.weight_decay)
 

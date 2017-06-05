@@ -65,8 +65,7 @@ class BiRNNModel(nn.Module):
         return self.softmax(self.classifier(class_hidden))
 
     def format_data(self, xin, yin):
-        xinputshape = xin[0].shape
-        xformateed = Variable(torch.FloatTensor(xin).view(-1, xinputshape[0], xinputshape[1]), requires_grad=True)
+        xformateed = Variable(torch.FloatTensor(xin), requires_grad=True)
         yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
         return xformateed, yformateed
 

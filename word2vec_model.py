@@ -13,9 +13,8 @@ import random
 import collections
 
 
-class Data(object):
-    def __init__(self, datapath, word2vecmodelfile, train_ratio, remove_stopwords, title_trunc, body_trunc):
-        word2vec_bin_path = os.path.join(datapath, word2vecmodelfile)
+class BaseData(object):
+    def __init__(self, datapath, train_ratio, remove_stopwords, title_trunc, body_trunc):
         train_bodies_path = os.path.join(datapath, 'train_bodies.csv')
         train_stances_path = os.path.join(datapath, 'train_stances.csv')
         self.remove_stopwords = remove_stopwords
@@ -76,14 +75,21 @@ class Data(object):
         random.shuffle(self.train_article_list)
         print(collections.Counter([a[2] for a in self.train_article_list]))
 
-        print('Loading %s' % word2vecmodelfile)
-        isbinary = word2vecmodelfile.split('.')[-1] == 'bin'
-        self._model = KeyedVectors.load_word2vec_format(word2vec_bin_path, binary=isbinary)
-        self.vecdim = self._modeldim = self._model.vector_size
-        print('Dim of word vector:', self.vecdim)
+        self.trainvecs, self.trainres = None, None
+        self.validatevecs, self.validateres = None, None
 
-        self.trainvecs, self.trainres = self._data(self.train_article_list)
-        self.validatevecs, self.validateres = self._data(self.validate_article_list)
+    def _clean(self, s):
+        return map(lambda x: x.lower(), re.findall(r'[a-zA-Z]+', s, flags=re.UNICODE))
+
+    def _remove_stopwords(self, l):
+        return [w for w in l if w not in feature_extraction.text.ENGLISH_STOP_WORDS and len(w) > 1]
+
+    def _preprocess_text(self, s, trunc):
+        if self.remove_stopwords:
+            res = self._remove_stopwords(self._clean(s))
+        else:
+            res = list(self._clean(s))
+        return res[:trunc]
 
     def train_batch(self, batch_size):
         return self._batch(self.trainvecs, self.trainres, self.trainsize, batch_size)
@@ -102,39 +108,132 @@ class Data(object):
             t += batch_size
 
     def _data(self, alist):
-        return list(map(lambda article:
-                        self._get_vec_from_words(article[0], self.maxtitlelen, article[1], self.maxbodylen), alist)), \
-               list(map(lambda article:
-                        self.stance2intmap[article[2]], alist))
+        return np.vstack(tuple(map(lambda article:
+                                   self._get_vec_from_words(article[0], self.maxtitlelen, article[1], self.maxbodylen),
+                                   alist))), \
+               np.vstack(tuple(map(lambda article:
+                                   self.stance2intmap[article[2]], alist)))
 
-    def _clean(self, s):
-        return map(lambda x: x.lower(), re.findall(r'[a-zA-Z]+', s, flags=re.UNICODE))
+    def _get_vec_from_words(self, s0, fillzerosto0, s1, fillzerosto1):
+        raise NotImplementedError('You should implement this to define different forms of word2vec!')
 
-    def _remove_stopwords(self, l):
-        return [w for w in l if w not in feature_extraction.text.ENGLISH_STOP_WORDS and len(w) > 1]
 
-    def _preprocess_text(self, s, trunc):
-        if self.remove_stopwords:
-            res = self._remove_stopwords(self._clean(s))
-        else:
-            res = list(self._clean(s))
-        return res[:trunc]
+# class Data(BaseData):
+#     def __init__(self, datapath, word2vecmodelfile, train_ratio, remove_stopwords, title_trunc, body_trunc):
+#         super(Data, self).__init__(datapath, train_ratio, remove_stopwords, title_trunc, body_trunc)
+#
+#         word2vec_bin_path = os.path.join(datapath, word2vecmodelfile)
+#         print('Loading %s' % word2vecmodelfile)
+#         isbinary = word2vecmodelfile.split('.')[-1] == 'bin'
+#         self._model = KeyedVectors.load_word2vec_format(word2vec_bin_path, binary=isbinary)
+#         self.vecdim = self._modeldim = self._model.vector_size
+#         print('Dim of word vector:', self.vecdim)
+#
+#         self.trainvecs, self.trainres = self._data(self.train_article_list)
+#         self.validatevecs, self.validateres = self._data(self.validate_article_list)
+#
+#     def _get_vec_from_words(self, s0, fillzerosto0, s1, fillzerosto1):
+#         lens0 = len(s0)
+#         lens1 = len(s1)
+#         vecs = [np.zeros(self._modeldim) for t in range(fillzerosto0 + fillzerosto1)]
+#         for t in range(lens0):
+#             try:
+#                 vecs[t] = self._model.word_vec(s0[t])
+#             except KeyError:
+#                 pass
+#         for t in range(lens1):
+#             try:
+#                 vecs[t + fillzerosto0] = self._model.word_vec(s1[t])
+#             except KeyError:
+#                 pass
+#         return np.expand_dims(np.vstack(tuple(vecs)).astype(np.float64), axis=0)
+#
+#
+# class SelfEmbData(BaseData):
+#     def __init__(self, datapath, train_ratio, remove_stopwords, title_trunc, body_trunc, vecdim):
+#         super(SelfEmbData, self).__init__(datapath, train_ratio, remove_stopwords, title_trunc, body_trunc)
+#
+#         words = []
+#         for a in self.article_list:
+#             words.extend(a[0])
+#             words.extend(a[1])
+#         words = list(set(words))
+#         self.wordnum = len(words) + 1   # one for padding
+#         self.PADDING = self.wordnum - 1
+#         self.dictionary = {}
+#         for t in range(len(words)):
+#             self.dictionary[words[t]] = t
+#
+#         self.trainvecs, self.trainres = self._data(self.train_article_list)
+#         self.validatevecs, self.validateres = self._data(self.validate_article_list)
+#         self.vecdim = vecdim
+#
+#     def _get_vec_from_words(self, s0, fillzerosto0, s1, fillzerosto1):
+#         lens0 = len(s0)
+#         lens1 = len(s1)
+#         vecs = [self.PADDING for t in range(fillzerosto0 + fillzerosto1)]
+#         for t in range(lens0):
+#             try:
+#                 vecs[t] = self.dictionary[s0[t]]
+#             except KeyError:
+#                 pass
+#         for t in range(lens1):
+#             try:
+#                 vecs[t + fillzerosto0] = self.dictionary[s1[t]]
+#             except KeyError:
+#                 pass
+#         return np.array(vecs).astype(np.int)
+
+class EmbData(BaseData):
+    def __init__(self, datapath, train_ratio, remove_stopwords, title_trunc, body_trunc, selfembedding,
+                 word2vecmodelfile=None, vecdim=None):
+        super(EmbData, self).__init__(datapath, train_ratio, remove_stopwords, title_trunc, body_trunc)
+
+        words = []
+        for a in self.article_list:
+            words.extend(a[0])
+            words.extend(a[1])
+        words = sorted(list(set(words)))
+        self.wordnum = len(words) + 1  # one for padding
+        self.PADDING = self.wordnum - 1
+        self.dictionary = {}
+        for t in range(len(words)):
+            self.dictionary[words[t]] = t
+
+        self.trainvecs, self.trainres = self._data(self.train_article_list)
+        self.validatevecs, self.validateres = self._data(self.validate_article_list)
+        self.vecdim = vecdim
+
+        if not selfembedding:
+            word2vec_bin_path = os.path.join(datapath, word2vecmodelfile)
+            print('Loading %s' % word2vecmodelfile)
+            isbinary = word2vecmodelfile.split('.')[-1] == 'bin'
+            _model = KeyedVectors.load_word2vec_format(word2vec_bin_path, binary=isbinary)
+            self.vecdim = _model.vector_size
+            print('Dim of word vector:', self.vecdim)
+            self.embedding = np.zeros((self.wordnum, self.vecdim))
+            for t in range(len(words)):
+                try:
+                    np.copyto(self.embedding[t], _model.word_vec(words[t]))
+                except KeyError:
+                    pass
+            _model = None
 
     def _get_vec_from_words(self, s0, fillzerosto0, s1, fillzerosto1):
         lens0 = len(s0)
         lens1 = len(s1)
-        vecs = [np.zeros(self._modeldim) for t in range(fillzerosto0 + fillzerosto1)]
+        vecs = [self.PADDING for t in range(fillzerosto0 + fillzerosto1)]
         for t in range(lens0):
             try:
-                vecs[t] = self._model.word_vec(s0[t])
+                vecs[t] = self.dictionary[s0[t]]
             except KeyError:
                 pass
         for t in range(lens1):
             try:
-                vecs[t + fillzerosto0] = self._model.word_vec(s1[t])
+                vecs[t + fillzerosto0] = self.dictionary[s1[t]]
             except KeyError:
                 pass
-        return np.vstack(tuple(vecs)).astype(np.float64)
+        return np.array(vecs).astype(np.int)
 
 
 if __name__ == '__main__':

@@ -106,8 +106,7 @@ class GlobalNMTAttentionRNNModel(nn.Module):
         return self.softmax(self.classifier(class_hidden))
 
     def format_data(self, xin, yin):
-        xinputshape = xin[0].shape
-        xformateed = Variable(torch.FloatTensor(xin).view(-1, xinputshape[0], xinputshape[1]), requires_grad=True)
+        xformateed = Variable(torch.FloatTensor(xin), requires_grad=True)
         yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
         return xformateed, yformateed
 
@@ -177,8 +176,7 @@ class QAGlobalAttentionRNNModel(nn.Module):
         return self.softmax(self.classifier(class_hidden))
 
     def format_data(self, xin, yin):
-        xinputshape = xin[0].shape
-        xformateed = Variable(torch.FloatTensor(xin).view(-1, xinputshape[0], xinputshape[1]), requires_grad=True)
+        xformateed = Variable(torch.FloatTensor(xin), requires_grad=True)
         yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
         return xformateed, yformateed
 
@@ -199,5 +197,9 @@ if __name__ == '__main__':
             bidirectional=True,
             on_cuda=False
     )
-    x = Variable(torch.rand(100, 140, 10), requires_grad=True)
-    print(attm(x))
+    # x = Variable(torch.rand(100, 140, 10), requires_grad=True)
+    # print(attm(x))
+    import numpy as np
+    x = np.zeros((10,100,30))
+    y = np.vstack(tuple([0 for _ in range(100)]))
+    print(attm.format_data(x, y))
