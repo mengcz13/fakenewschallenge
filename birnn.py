@@ -5,7 +5,7 @@ from torch.autograd import Variable
 
 class BiRNNModel(nn.Module):
     def __init__(self, titleninput, bodyninput,
-                 nhidden, nlayers,
+                 nhidden, nlayers, classify_hidden,
                  nclass, title_len, body_len,
                  rnntype, dropout, conditional, bidirectional, on_cuda=False):
         super(BiRNNModel, self).__init__()
@@ -28,7 +28,8 @@ class BiRNNModel(nn.Module):
                                               batch_first=True, bidirectional=bidirectional)
         self.body_rnn = getattr(nn, rnntype)(bodyninput, nhidden, nlayers,
                                              batch_first=True, bidirectional=bidirectional)
-        self.classifier = nn.Linear((nhidden + nhidden) * self.chn, nclass)
+        self.decoder = nn.Linear((nhidden + nhidden) * self.chn, classify_hidden)
+        self.classifier = nn.Linear(classify_hidden, nclass)
         self.softmax = nn.Softmax()
 
     def _init_hidden(self, bsz):
@@ -60,7 +61,13 @@ class BiRNNModel(nn.Module):
         body_out, _ = self.body_rnn(body, body_hidden)
 
         output = torch.cat((title_out[:, -1, :], body_out[:, -1, :]), 1)
-        return self.softmax(self.classifier(self.drop(output)))
+        class_hidden = self.drop(self.decoder(output))
+        return self.softmax(self.classifier(class_hidden))
+
+    # def format_data(self, xin, yin):
+    #     xformateed = Variable(torch.FloatTensor(xin), requires_grad=True)
+    #     yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
+    #     return xformateed, yformateed
 
 
 if __name__ == '__main__':
@@ -74,8 +81,8 @@ if __name__ == '__main__':
     body_len = 100
     bsz = 5
     wemb = 50
-    input = Variable(torch.rand(bsz,title_len + body_len, wemb))
+    input = Variable(torch.rand(title_len + body_len, bsz, wemb)).cuda()
 
-    bm = BiRNNModel(wemb, wemb, nhidden, nlayers, nclass, title_len, body_len, 'LSTM',0.1, True,True)
+    bm = BiRNNModel(wemb, wemb, nhidden, nlayers, classify_hidden, nclass, title_len, body_len, 'LSTM')
 
     print(bm.forward(input))

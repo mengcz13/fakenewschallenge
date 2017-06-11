@@ -22,37 +22,35 @@ if __name__ == '__main__':
     comms = []
 
     # Dimension comparision
-    # dims = [50, 100, 200]
-    # comms.extend([
-    #     '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_%sd --word2vecmodelfile glove.twitter.27B.%sd.txt --fix_embedding --epoch 25' % (
-    #     t, t) for t in dims
-    # ])
-    # comms.extend([
-    #     '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_selfemb_50d --selfemb 50 --epoch 25',
-    #     '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_halfselfemb_50d --word2vecmodelfile glove.twitter.27B.50d.txt --epoch 25',
-    # ])
-
-    # models
-    models = ['cnn', 'rnn_gru_cond_bi', 'rnn_gru_nocond_bi', 'globalnmt_attention_gru_cond_bi',
-              'qaglobal_attention_gru_cond_bi', 'cnn_rnn']
+    dims = [50, 100, 200]
     comms.extend([
-        '--cuda %s savedmodels/%s --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding --epoch 200 --resume' % (
-        t, t)
-        for t in
-        models
+        '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_%sd --word2vecmodelfile glove.twitter.27B.%sd.txt --fix_embedding' % (t, t) for t in dims
     ])
+    comms.extend([
+        '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_selfemb_50d --selfemb 50',
+        '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_halfselfemb_50d --word2vecmodelfile glove.twitter.27B.50d.txt',
+    ])
+    # 50 is enough!
 
     # Body length
     body_lens = [100, 200, 300]
     comms.extend([
-        '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_%sbody --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding --body_trunc %s --epoch 25' % (
-            t, t) for t in body_lens
+        '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_%sbody --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding --body_trunc %s' % (
+        t, t) for t in body_lens
     ])
 
     # LSTM and GRU
     comms.extend([
-        '--cuda rnn_lstm_cond_bi savedmodels/rnn_lstm_cond_bi_lstm --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding --epoch 25',
-        '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_gru --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding --epoch 25',
+        '--cuda rnn_lstm_cond_bi savedmodels/rnn_lstm_cond_bi_lstm --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding',
+        '--cuda rnn_gru_cond_bi savedmodels/rnn_gru_cond_bi_gru --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding',
+    ])
+
+    # models
+    models = ['cnn', 'rnn_gru_cond_bi', 'rnn_gru_nocond_bi', 'globalnmt_attention_gru_cond_bi',
+              'qaglobal_attention_gru_cond_bi', 'cnn_rnn', 'basic_nn']
+    comms.extend([
+        '--cuda %s savedmodels/%s --word2vecmodelfile glove.twitter.27B.50d.txt --fix_embedding' % (t, t) for t in
+        models
     ])
 
     for t, comm in enumerate(comms):
