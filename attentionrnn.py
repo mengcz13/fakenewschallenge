@@ -40,7 +40,7 @@ class GlobalNMTAttentionRNNModel(nn.Module):
     https://arxiv.org/pdf/1508.04025.pdf
     '''
     def __init__(self, titleninput, bodyninput,
-                 nhidden, nlayers, classify_hidden,
+                 nhidden, nlayers,
                  nclass, title_len, body_len,
                  rnntype, dropout, conditional, bidirectional, on_cuda=False):
         super(GlobalNMTAttentionRNNModel, self).__init__()
@@ -66,8 +66,7 @@ class GlobalNMTAttentionRNNModel(nn.Module):
         self.attention = AttentionOutRNNUnit(nhidden * self.chn, nhidden * self.chn, on_cuda)
         self.linear_attention = nn.Linear((nhidden + nhidden) * self.chn, nhidden * self.chn)
         self.tanh = nn.Tanh()
-        self.decoder = nn.Linear((nhidden + nhidden) * self.chn, classify_hidden)
-        self.classifier = nn.Linear(classify_hidden, nclass)
+        self.classifier = nn.Linear((nhidden + nhidden) * self.chn, nclass)
         self.softmax = nn.Softmax()
 
     def _init_hidden(self, bsz):
@@ -102,18 +101,12 @@ class GlobalNMTAttentionRNNModel(nn.Module):
         body_out = self.tanh(self.linear_attention(torch.cat((body_out_context, body_out[:, -1, :]), dim=1)))
 
         output = torch.cat((title_out[:, -1, :], body_out), 1)
-        class_hidden = self.drop(self.decoder(output))
-        return self.softmax(self.classifier(class_hidden))
-
-    def format_data(self, xin, yin):
-        xformateed = Variable(torch.FloatTensor(xin), requires_grad=True)
-        yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
-        return xformateed, yformateed
+        return self.softmax(self.classifier(self.drop(output)))
 
 
 class QAGlobalAttentionRNNModel(nn.Module):
     def __init__(self, titleninput, bodyninput,
-                 nhidden, nlayers, classify_hidden,
+                 nhidden, nlayers,
                  nclass, title_len, body_len,
                  rnntype, dropout, conditional, bidirectional, on_cuda=False):
         super(QAGlobalAttentionRNNModel, self).__init__()
@@ -137,8 +130,7 @@ class QAGlobalAttentionRNNModel(nn.Module):
         self.body_rnn = getattr(nn, rnntype)(bodyninput, nhidden, nlayers,
                                              batch_first=True, bidirectional=bidirectional)
         self.attention = AttentionOutRNNUnit(nhidden * self.chn, nhidden * self.chn, on_cuda)
-        self.decoder = nn.Linear((nhidden + nhidden) * self.chn, classify_hidden)
-        self.classifier = nn.Linear(classify_hidden, nclass)
+        self.classifier = nn.Linear((nhidden + nhidden) * self.chn, nclass)
         self.softmax = nn.Softmax()
 
     def _init_hidden(self, bsz):
@@ -172,22 +164,20 @@ class QAGlobalAttentionRNNModel(nn.Module):
         body_out = self.attention(title_out[:, -1, :], body_out)
 
         output = torch.cat((title_out[:, -1, :], body_out), 1)
-        class_hidden = self.drop(self.decoder(output))
-        return self.softmax(self.classifier(class_hidden))
+        return self.softmax(self.classifier(self.drop(output)))
 
-    def format_data(self, xin, yin):
-        xformateed = Variable(torch.FloatTensor(xin), requires_grad=True)
-        yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
-        return xformateed, yformateed
+    # def format_data(self, xin, yin):
+    #     xformateed = Variable(torch.FloatTensor(xin), requires_grad=True)
+    #     yformateed = Variable(torch.LongTensor(yin).view(-1), requires_grad=False)
+    #     return xformateed, yformateed
 
 
 if __name__ == '__main__':
-    attm = QAGlobalAttentionRNNModel(
+    attm = GlobalNMTAttentionRNNModel(
             titleninput=10,
             bodyninput=10,
             nhidden=10,
             nlayers=2,
-            classify_hidden=4 * 10,
             nclass=4,
             title_len=40,
             body_len=100,
@@ -197,9 +187,5 @@ if __name__ == '__main__':
             bidirectional=True,
             on_cuda=False
     )
-    # x = Variable(torch.rand(100, 140, 10), requires_grad=True)
-    # print(attm(x))
-    import numpy as np
-    x = np.zeros((10,100,30))
-    y = np.vstack(tuple([0 for _ in range(100)]))
-    print(attm.format_data(x, y))
+    x = Variable(torch.rand(100, 140, 10), requires_grad=True)
+    print(attm(x))

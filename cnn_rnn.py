@@ -3,14 +3,17 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 
-class BiRNNModel(nn.Module):
+class CNNRNNModel(nn.Module):
     def __init__(self, titleninput, bodyninput,
-                 nhidden, nlayers,
+                 nhidden, nlayers, classify_hidden,
                  nclass, title_len, body_len,
                  rnntype, dropout, conditional, bidirectional, on_cuda=False):
-        super(BiRNNModel, self).__init__()
+        super(CNNRNNModel, self).__init__()
+        self.titleninput = titleninput
+        self.bodyninput = bodyninput
         self.nhidden = nhidden
         self.nlayers = nlayers
+        self.classify_hidden = classify_hidden
         self.title_len = title_len
         self.body_len = body_len
         self.conditional = conditional
@@ -28,7 +31,12 @@ class BiRNNModel(nn.Module):
                                               batch_first=True, bidirectional=bidirectional)
         self.body_rnn = getattr(nn, rnntype)(bodyninput, nhidden, nlayers,
                                              batch_first=True, bidirectional=bidirectional)
-        self.classifier = nn.Linear((nhidden + nhidden) * self.chn, nclass)
+        self.decoder_title = nn.Linear(nhidden * self.chn + titleninput, classify_hidden)
+        self.decoder_body = nn.Linear(nhidden * self.chn + bodyninput, classify_hidden)
+        self.tanh = nn.Tanh()
+        self.maxpool_title = nn.MaxPool1d(title_len)
+        self.maxpool_body = nn.MaxPool1d(body_len)
+        self.classifier = nn.Linear(classify_hidden * 2, nclass)
         self.softmax = nn.Softmax()
 
     def _init_hidden(self, bsz):
@@ -59,8 +67,15 @@ class BiRNNModel(nn.Module):
             body_hidden = self._init_hidden(x.size(0))
         body_out, _ = self.body_rnn(body, body_hidden)
 
-        output = torch.cat((title_out[:, -1, :], body_out[:, -1, :]), 1)
-        return self.softmax(self.classifier(self.drop(output)))
+        title_conv = torch.cat((title_out, title), dim=2).view(-1, self.nhidden * self.chn + self.titleninput)
+        body_conv = torch.cat((body_out, body), dim=2).view(-1, self.nhidden * self.chn + self.bodyninput)
+        title_conv = self.tanh(self.decoder_title(title_conv)).view(-1, self.title_len, self.classify_hidden)
+        body_conv = self.tanh(self.decoder_body(body_conv)).view(-1, self.body_len, self.classify_hidden)
+        title_conv = self.maxpool_title(torch.transpose(title_conv, 1, 2)).view(-1, self.classify_hidden)
+        body_conv = self.maxpool_body(torch.transpose(body_conv, 1, 2)).view(-1, self.classify_hidden)
+        tbconv = torch.cat((title_conv, body_conv), 1)
+
+        return self.softmax(self.classifier(self.drop(tbconv)))
 
 
 if __name__ == '__main__':
@@ -74,8 +89,8 @@ if __name__ == '__main__':
     body_len = 100
     bsz = 5
     wemb = 50
-    input = Variable(torch.rand(bsz,title_len + body_len, wemb))
+    input = Variable(torch.rand(bsz, title_len + body_len, wemb))
 
-    bm = BiRNNModel(wemb, wemb, nhidden, nlayers, nclass, title_len, body_len, 'LSTM',0.1, True,True)
+    bm = CNNRNNModel(wemb, wemb, nhidden, nlayers, classify_hidden, nclass, title_len, body_len, 'GRU', 0.1, True, True)
 
     print(bm.forward(input))

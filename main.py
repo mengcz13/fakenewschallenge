@@ -4,6 +4,8 @@ from word2vec_model import EmbData
 from nnmodel import NNModel
 from birnn import BiRNNModel
 from attentionrnn import GlobalNMTAttentionRNNModel, QAGlobalAttentionRNNModel
+from cnn_rnn import CNNRNNModel
+from basic_nn import BasicNNModel
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -17,6 +19,8 @@ import sys
 import random
 import os
 from sklearn.metrics import confusion_matrix
+import pickle
+import re
 
 
 class RedirectedWechatOut(object):
@@ -30,6 +34,7 @@ class RedirectedWechatOut(object):
         except:
             pass
 
+
 class ModelWithEmbedding(nn.Module):
     def __init__(self, wordnum, vecdim, model, pretrained_embedding=None, fix_embedding=False):
         super(ModelWithEmbedding, self).__init__()
@@ -39,7 +44,6 @@ class ModelWithEmbedding(nn.Module):
             self.embedding.weight.data.copy_(torch.from_numpy(pretrained_embedding))
             if fix_embedding:
                 self.embedding.weight.requires_grad = False
-
 
     def forward(self, x):
         return self.model(self.embedding(x))
@@ -54,7 +58,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('--datapath', type=str, default='./data',
                         help='path to the data folder')
-    parser.add_argument('--word2vecmodelfile', type=str, default='glove.twitter.27B.100d.txt',
+    parser.add_argument('--word2vecmodelfile', type=str, default='glove.twitter.27B.50d.txt',
                         help='file name of pre-trained word2vec model')
     parser.add_argument('--fix_embedding', action='store_true',
                         help='fix pre-trained embedding')
@@ -64,7 +68,7 @@ def main():
                         help='flag for removing stopwords')
     parser.add_argument('--batch_size', type=int, default=384,
                         help='batch size in each iteration')
-    parser.add_argument('--epoch', type=int, default=50,
+    parser.add_argument('--epoch', type=int, default=100,
                         help='epoch times')
     parser.add_argument('--cuda', action='store_true',
                         help='use if you want the model to run on CUDA')
@@ -88,6 +92,8 @@ def main():
                         help='type of optimizer')
     parser.add_argument('--selfemb', type=int, default=None,
                         help='add embedding as a section of network, instead of using pre-trained word2vec')
+    parser.add_argument('--resume', action='store_true',
+                        help='resume from the latest model and train until reaching the epoch num')
     options = parser.parse_args()
     print(options)
 
@@ -106,9 +112,14 @@ def main():
     if not os.path.exists(MODELPATH):
         os.makedirs(MODELPATH)
 
+    checkpoint = None
+    modelbest = None
+    if options.resume:
+        checkpoint, modelbest = load_latest_checkpoint(MODELPATH)
+
     if options.selfemb is not None:
         traindata = EmbData(options.datapath, options.train_ratio, options.remove_stopwords, options.title_trunc,
-                     options.body_trunc, selfembedding=True, word2vecmodelfile=None, vecdim=options.selfemb)
+                            options.body_trunc, selfembedding=True, word2vecmodelfile=None, vecdim=options.selfemb)
     else:
         traindata = EmbData(options.datapath, options.train_ratio, options.remove_stopwords, options.title_trunc,
                             options.body_trunc, selfembedding=False, word2vecmodelfile=options.word2vecmodelfile,
@@ -116,6 +127,14 @@ def main():
 
     # Build model, optimizer and loss function
     models = {
+        'basic_nn': BasicNNModel(
+            inputn=traindata.vecdim,
+            title_len=traindata.maxtitlelen,
+            body_len=traindata.maxbodylen,
+            nhidden=2 * traindata.vecdim,
+            nclass=traindata.stancelen,
+            dropout=0.1
+        ),
         'cnn': NNModel(
             title_input_size=(1, traindata.maxtitlelen, traindata.vecdim),
             title_out_channels=traindata.vecdim,
@@ -123,7 +142,6 @@ def main():
             body_input_size=(1, traindata.maxbodylen, traindata.vecdim),
             body_out_channels=traindata.vecdim,
             body_kernel_width=5,
-            hiddennum=2 * traindata.vecdim,
             dropout=0.1,
             catnum=traindata.stancelen
         ),
@@ -132,7 +150,6 @@ def main():
             bodyninput=traindata.vecdim,
             nhidden=traindata.vecdim,
             nlayers=2,
-            classify_hidden=4 * traindata.vecdim,
             nclass=traindata.stancelen,
             title_len=traindata.maxtitlelen,
             body_len=traindata.maxbodylen,
@@ -147,7 +164,6 @@ def main():
             bodyninput=traindata.vecdim,
             nhidden=traindata.vecdim,
             nlayers=2,
-            classify_hidden=4 * traindata.vecdim,
             nclass=traindata.stancelen,
             title_len=traindata.maxtitlelen,
             body_len=traindata.maxbodylen,
@@ -162,7 +178,6 @@ def main():
             bodyninput=traindata.vecdim,
             nhidden=traindata.vecdim,
             nlayers=2,
-            classify_hidden=4 * traindata.vecdim,
             nclass=traindata.stancelen,
             title_len=traindata.maxtitlelen,
             body_len=traindata.maxbodylen,
@@ -177,7 +192,6 @@ def main():
             bodyninput=traindata.vecdim,
             nhidden=traindata.vecdim,
             nlayers=2,
-            classify_hidden=4 * traindata.vecdim,
             nclass=traindata.stancelen,
             title_len=traindata.maxtitlelen,
             body_len=traindata.maxbodylen,
@@ -192,7 +206,6 @@ def main():
             bodyninput=traindata.vecdim,
             nhidden=traindata.vecdim,
             nlayers=2,
-            classify_hidden=4 * traindata.vecdim,
             nclass=traindata.stancelen,
             title_len=traindata.maxtitlelen,
             body_len=traindata.maxbodylen,
@@ -207,7 +220,21 @@ def main():
             bodyninput=traindata.vecdim,
             nhidden=traindata.vecdim,
             nlayers=2,
-            classify_hidden=4 * traindata.vecdim,
+            nclass=traindata.stancelen,
+            title_len=traindata.maxtitlelen,
+            body_len=traindata.maxbodylen,
+            rnntype='GRU',
+            dropout=0.1,
+            conditional=True,
+            bidirectional=True,
+            on_cuda=options.cuda
+        ),
+        'cnn_rnn': CNNRNNModel(
+            titleninput=traindata.vecdim,
+            bodyninput=traindata.vecdim,
+            nhidden=traindata.vecdim,
+            nlayers=2,
+            classify_hidden=2 * traindata.vecdim,
             nclass=traindata.stancelen,
             title_len=traindata.maxtitlelen,
             body_len=traindata.maxbodylen,
@@ -237,12 +264,24 @@ def main():
     if options.cuda:
         loss_func = loss_func.cuda()
 
+    start_epoch = 0
+    if checkpoint:
+        nnmodel.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        start_epoch = checkpoint['running_record']['epoch'] + 1
     best_score = 0
+    if modelbest:
+        best_score = modelbest['running_record']['validate_result'][3]
 
     starttime = datetime.datetime.now()
     print('Start training at: %s' % starttime)
 
-    for t in range(options.epoch):
+    running_records = []
+    if options.resume and os.path.exists(os.path.join(MODELPATH, 'records.pkl')):
+        with open(os.path.join(MODELPATH, 'records.pkl'), 'rb') as f:
+            running_records = pickle.load(f)
+
+    for t in range(start_epoch, options.epoch):
         train_mean_loss, train_mean_accu, train_mean_cmatrix, train_score = train_epoch(traindata, nnmodel, optimizer,
                                                                                         loss_func, options, t)
         validate_mean_loss, validate_mean_accu, validate_mean_cmatrix, validate_score = validate_epoch(traindata,
@@ -251,16 +290,23 @@ def main():
                                                                                                        options, t)
 
         isbest = (validate_score > best_score)
-        save_checkpoint({
+        running_record = {
             'epoch': t,
             'train_result': (train_mean_loss, train_mean_accu, train_mean_cmatrix, train_score),
             'validate_result': (validate_mean_loss, validate_mean_accu, validate_mean_cmatrix, validate_score),
-            'state_dict': nnmodel.state_dict(),
-            'optimizer': optimizer.state_dict(),
             'options': options
+        }
+        running_records.append(running_record)
+        save_checkpoint({
+            'running_record': running_record,
+            'state_dict': nnmodel.state_dict(),
+            'optimizer': optimizer.state_dict()
         }, isbest, MODELPATH, filename='checkpoint_%s.pth.tar' % t)
         if isbest:
             best_score = validate_score
+
+    with open(os.path.join(MODELPATH, 'records.pkl'), 'wb+') as f:
+        pickle.dump(running_records, f)
 
 
 def train_epoch(data, model, optimizer, loss_func, options, epoch_t):
@@ -345,20 +391,29 @@ def get_confusion_matrix(pred_score, output):
 
 
 def get_score(confmat):
-    score = 0
-    for t in range(4):
-        score += confmat[t][t]
-    for t1 in range(3):
-        for t2 in range(3):
-            if t1 != t2:
-                score += 0.25 * confmat[t1][t2]
-    return score / np.sum(confmat)
+    return (np.sum(confmat[:3, :3]) * 0.25 + confmat[3][3] * 0.25 + (
+        confmat[0][0] + confmat[1][1] + confmat[2][2]) * 0.75) / (np.sum(confmat[:3, :]) + np.sum(confmat[3, :]) * 0.25)
 
 
 def save_checkpoint(state, isbest, filepath, filename='checkpoint.pth.tar'):
     torch.save(state, os.path.join(filepath, filename))
     if isbest:
         shutil.copyfile(os.path.join(filepath, filename), os.path.join(filepath, 'model_best.pth.tar'))
+
+
+def load_latest_checkpoint(modelpath):
+    try:
+        max_epoch = max([int(m.group(1)) for m in filter(lambda x: x is not None,
+                                                    [re.match(r'checkpoint_(\d+)\.pth\.tar', pname) for pname in
+                                                     os.listdir(modelpath)])])
+        checkpoint = torch.load(os.path.join(modelpath, 'checkpoint_%s.pth.tar' % max_epoch))
+        modelbest = torch.load(os.path.join(modelpath, 'model_best.pth.tar'))
+        print('Loaded checkpoint %s!!!' % max_epoch)
+    except:
+        checkpoint = None
+        modelbest = None
+        print('No existing checkpoints!!!')
+    return checkpoint, modelbest
 
 
 if __name__ == '__main__':
