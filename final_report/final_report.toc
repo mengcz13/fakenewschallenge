@@ -1,0 +1,25 @@
+\contentsline {section}{\numberline {1}问题介绍}{1}{section.1}
+\contentsline {section}{\numberline {2}相关工作}{1}{section.2}
+\contentsline {section}{\numberline {3}实验任务}{1}{section.3}
+\contentsline {section}{\numberline {4}模型设计}{1}{section.4}
+\contentsline {subsection}{\numberline {4.1}Baseline}{1}{subsection.4.1}
+\contentsline {subsection}{\numberline {4.2}Word Embedding}{2}{subsection.4.2}
+\contentsline {subsection}{\numberline {4.3}损失函数}{2}{subsection.4.3}
+\contentsline {subsection}{\numberline {4.4}基于CNN的模型}{3}{subsection.4.4}
+\contentsline {subsection}{\numberline {4.5}基于RNN的模型}{3}{subsection.4.5}
+\contentsline {subsubsection}{\numberline {4.5.1}双向RNN模型}{4}{subsubsection.4.5.1}
+\contentsline {subsubsection}{\numberline {4.5.2}引入了attention机制的RNN模型}{5}{subsubsection.4.5.2}
+\contentsline {subsection}{\numberline {4.6}混合模型}{6}{subsection.4.6}
+\contentsline {section}{\numberline {5}实验}{6}{section.5}
+\contentsline {subsection}{\numberline {5.1}实验数据}{6}{subsection.5.1}
+\contentsline {subsection}{\numberline {5.2}评价标准}{7}{subsection.5.2}
+\contentsline {subsection}{\numberline {5.3}模型实现, 参数设置与运行环境}{8}{subsection.5.3}
+\contentsline {subsection}{\numberline {5.4}实验结果}{8}{subsection.5.4}
+\contentsline {subsubsection}{\numberline {5.4.1}词向量维度的影响}{8}{subsubsection.5.4.1}
+\contentsline {subsubsection}{\numberline {5.4.2}词向量训练方式的影响}{9}{subsubsection.5.4.2}
+\contentsline {subsubsection}{\numberline {5.4.3}正文截取长度的影响}{9}{subsubsection.5.4.3}
+\contentsline {subsubsection}{\numberline {5.4.4}RNN单元种类的影响}{10}{subsubsection.5.4.4}
+\contentsline {subsubsection}{\numberline {5.4.5}模型效果比较}{11}{subsubsection.5.4.5}
+\contentsline {section}{\numberline {6}结论}{13}{section.6}
+\contentsline {section}{\numberline {A}运行参数设置}{i}{appendix.A}
+\contentsline {section}{\numberline {B}程序运行说明}{i}{appendix.B}

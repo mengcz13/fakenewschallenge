@@ -1,0 +1,90 @@
+\begin{thebibliography}{10}
+
+\bibitem{mohammad2016semeval}
+Saif~M Mohammad, Svetlana Kiritchenko, Parinaz Sobhani, Xiaodan Zhu, and Colin
+  Cherry.
+\newblock Semeval-2016 task 6: Detecting stance in tweets.
+\newblock {\em Proceedings of SemEval}, 16, 2016.
+
+\bibitem{zarrella2016mitre}
+Guido Zarrella and Amy Marsh.
+\newblock Mitre at semeval-2016 task 6: Transfer learning for stance detection.
+\newblock {\em arXiv preprint arXiv:1606.03784}, 2016.
+
+\bibitem{wei2016pkudblab}
+Wan Wei, Xiao Zhang, Xuqin Liu, Wei Chen, and Tengjiao Wang.
+\newblock pkudblab at semeval-2016 task 6: A specific convolutional neural
+  network system for effective stance detection.
+\newblock {\em Proceedings of SemEval}, pages 384--388, 2016.
+
+\bibitem{graves2005framewise}
+Alex Graves and J{\"u}rgen Schmidhuber.
+\newblock Framewise phoneme classification with bidirectional lstm and other
+  neural network architectures.
+\newblock {\em Neural Networks}, 18(5):602--610, 2005.
+
+\bibitem{lai2015recurrent}
+Siwei Lai, Liheng Xu, Kang Liu, and Jun Zhao.
+\newblock Recurrent convolutional neural networks for text classification.
+\newblock In {\em AAAI}, volume 333, pages 2267--2273, 2015.
+
+\bibitem{luong2015effective}
+Minh-Thang Luong, Hieu Pham, and Christopher~D Manning.
+\newblock Effective approaches to attention-based neural machine translation.
+\newblock {\em arXiv preprint arXiv:1508.04025}, 2015.
+
+\bibitem{chen2016thorough}
+Danqi Chen, Jason Bolton, and Christopher~D Manning.
+\newblock A thorough examination of the cnn/daily mail reading comprehension
+  task.
+\newblock {\em arXiv preprint arXiv:1606.02858}, 2016.
+
+\bibitem{mikolov2013distributed}
+Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg~S Corrado, and Jeff Dean.
+\newblock Distributed representations of words and phrases and their
+  compositionality.
+\newblock In {\em Advances in neural information processing systems}, pages
+  3111--3119, 2013.
+
+\bibitem{pennington2014glove}
+Jeffrey Pennington, Richard Socher, and Christopher~D Manning.
+\newblock Glove: Global vectors for word representation.
+\newblock In {\em EMNLP}, volume~14, pages 1532--1543, 2014.
+
+\bibitem{bojanowski2016enriching}
+Piotr Bojanowski, Edouard Grave, Armand Joulin, and Tomas Mikolov.
+\newblock Enriching word vectors with subword information.
+\newblock {\em arXiv preprint arXiv:1607.04606}, 2016.
+
+\bibitem{niwattanakul2013using}
+Suphakit Niwattanakul, Jatsada Singthongchai, Ekkachai Naenudorn, and
+  Supachanun Wanapu.
+\newblock Using of jaccard coefficient for keywords similarity.
+\newblock In {\em Proceedings of the International MultiConference of Engineers
+  and Computer Scientists}, volume~1, page~6, 2013.
+
+\bibitem{friedman2002stochastic}
+Jerome~H Friedman.
+\newblock Stochastic gradient boosting.
+\newblock {\em Computational Statistics \& Data Analysis}, 38(4):367--378,
+  2002.
+
+\bibitem{srivastava2014dropout}
+Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky, Ilya Sutskever, and Ruslan
+  Salakhutdinov.
+\newblock Dropout: A simple way to prevent neural networks from overfitting.
+\newblock {\em The Journal of Machine Learning Research}, 15(1):1929--1958,
+  2014.
+
+\bibitem{gers2000learning}
+Felix~A Gers, J{\"u}rgen Schmidhuber, and Fred Cummins.
+\newblock Learning to forget: Continual prediction with lstm.
+\newblock {\em Neural computation}, 12(10):2451--2471, 2000.
+
+\bibitem{chung2014empirical}
+Junyoung Chung, Caglar Gulcehre, KyungHyun Cho, and Yoshua Bengio.
+\newblock Empirical evaluation of gated recurrent neural networks on sequence
+  modeling.
+\newblock {\em arXiv preprint arXiv:1412.3555}, 2014.
+
+\end{thebibliography}
