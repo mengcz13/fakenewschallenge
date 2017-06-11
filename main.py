@@ -68,7 +68,7 @@ def main():
                         help='flag for removing stopwords')
     parser.add_argument('--batch_size', type=int, default=384,
                         help='batch size in each iteration')
-    parser.add_argument('--epoch', type=int, default=100,
+    parser.add_argument('--epoch', type=int, default=50,
                         help='epoch times')
     parser.add_argument('--cuda', action='store_true',
                         help='use if you want the model to run on CUDA')
